@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq" //init postgres driver
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/html"
@@ -16,6 +18,7 @@ import (
 
 var urlDonation = "https://cameroonsurvival.org/fr/dons/"
 var frequency = 10 * time.Second
+var port = 9090
 
 func main() {
 	osSignals := make(chan os.Signal, 1)
@@ -32,6 +35,24 @@ func main() {
 	defer db.Close()
 	recordErrors := 0
 	run := true
+
+	router := mux.NewRouter().StrictSlash(true)
+	router.HandleFunc("/records/last", lastValueHandler(db))
+	router.HandleFunc("/records/timeseries", allValuesHandler(db))
+
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: router,
+	}
+
+	// run httlp server in the background
+	go func() {
+		log.Infof("starting http handler on port %d", port)
+		httpServer.ListenAndServe()
+		log.Infof("http handler is shutdown")
+	}()
+
+	lastValue := 0.0
 	for run && recordErrors < 10 {
 		select {
 		case s := <-osSignals:
@@ -45,6 +66,11 @@ func main() {
 				recordErrors++
 				continue
 			}
+			if math.Abs(v-lastValue) < 1.0 {
+				continue
+			}
+			log.Infof("value changed from %d to %d", int(lastValue), int(v))
+			lastValue = v
 			if err = writeValue(db, time.Now(), v); err != nil {
 				log.Error("couldn't get latest value : %w", err)
 				recordErrors++
