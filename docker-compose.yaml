@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:10.6
+    ports:
+      - 65432:5432
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: cmsurvival
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+  cmsurvivalrecorder:
+    image: golang:1.13-alpine
+    command: go run cmtracker
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./go-modules:/go/pkg/mod # docker modules cache into a separate volume
+    depends_on:
+      - "db"
+    network_mode: "host"
