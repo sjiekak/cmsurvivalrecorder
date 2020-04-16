@@ -17,7 +17,7 @@ import (
 )
 
 var urlDonation = "https://cameroonsurvival.org/fr/dons/"
-var frequency = 10 * time.Second
+var frequency = 60 * time.Second
 var port = 9090
 
 func main() {
